@@ -239,6 +239,7 @@
       if (!v) return;
       var p = Parse.parse(v, { today: D.today() });
       if (p.arrows == null) { ctx.toast('I could not find an arrow count in that.'); return; }
+      if (p.arrows <= 0) { ctx.toast('That works out to zero arrows.'); return; }
       if (!p.setSize) p.setSize = st.settings.defaultSetSize;
       if (!p.distance) p.distance = st.settings.defaultDistance;
       Store.addSession(p);
