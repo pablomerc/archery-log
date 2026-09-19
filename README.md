@@ -3,9 +3,10 @@
 A small website for tracking archery practice: how many arrows you shot, when,
 and whether you are on track for your next competition.
 
-No accounts, no server, no build step. It is plain HTML, CSS and JavaScript —
-open `index.html` and it works. Your data is stored in your own browser and is
-never uploaded anywhere.
+No accounts, no build step, no framework. It is plain HTML, CSS and JavaScript —
+open `index.html` and it works. Your data stays in your browser unless you switch
+on sync, which stores it in your own GitHub repository so every device you own
+shares one log.
 
 ---
 
@@ -39,6 +40,9 @@ target can be overridden by hand.
 
 **Gear.** String life counted in arrows (not weeks), sight marks, personal bests.
 
+**Sync.** Optional. Your repo becomes the database, so your phone and laptop stay
+in step and anyone with the link sees the live log. See below.
+
 ---
 
 ## Running it
@@ -66,9 +70,11 @@ your phone and send to people.
 Go to <https://github.com/new>.
 
 - **Repository name**: `archery-log`
-- **Public** — this publishes the *code*, not your practice data. Your sessions
-  live in your browser only. (Private repos can also use Pages on a paid plan,
-  but then only people you invite can open the site, which defeats sharing it.)
+- **Public** — the site works either way, but public keeps it simple, and it is
+  what lets anyone you send the link to read your log once sync is on. If you
+  would rather your log were not public, GitHub Pro can publish a site from a
+  private repo; the page stays publicly reachable but the data file does not,
+  and then only your own devices can see the log.
 - Do **not** tick "Add a README" — this folder already has one.
 - Click **Create repository**.
 
@@ -116,31 +122,69 @@ Pages redeploys in a minute or so.
 
 ---
 
-## Your data, and moving it between devices
+## Syncing between your phone and your laptop
 
-Everything is stored in your browser's `localStorage`, under the key
-`archery-tracker:v1`. It never leaves your device on its own.
+By default the log lives only in the browser you typed it into. Turn on sync and
+your repository becomes the storage instead, so every device you own reads and
+writes the same file — and anyone you send the link to sees your live log
+without needing anything at all.
 
-This has one consequence worth understanding: **your phone and your computer
-keep separate logs.** Nothing syncs automatically, because there is no server.
-Three ways to deal with that:
+### How it works
 
-- **Share a snapshot** (*You* → *Share a snapshot*). This makes a link with your
-  data packed inside the link itself, after the `#`. The part after `#` is never
-  sent to any web server — the link *is* the data. Open it on your other device
-  and press *Keep this on this device*. This is the easiest phone ↔ computer
-  transfer, and also how you show your log to someone else.
-- **Download backup** gives you a `.json` file; *Restore from file* reads it
-  back, either merging or replacing.
-- **Export CSV** if you want to poke at it in a spreadsheet.
+- The log is a single file in your repo, `data/log.json`.
+- **Reading needs nothing.** Any visitor's browser fetches that file directly.
+  Open the link on a friend's phone and they see your current log.
+- **Writing needs a token**, which lives only in the browser you paste it into
+  and is never written into the repository.
+- Every save is an ordinary git commit, so you get the full history of your
+  training for free, and it is very hard to lose anything.
 
-Do take a backup occasionally. Clearing your browser's site data will erase the
-log, and nobody else has a copy.
+### Setting it up
 
-If you shared a snapshot and then keep shooting, the old link keeps showing the
-old data. Share a fresh one when you want them to see the latest.
+1. Open the app, go to **You**, and find **Sync across devices**. The username
+   and repository are filled in from the page address already.
+2. Follow the five steps shown there to create a fine-grained token. In short:
+   [create a token](https://github.com/settings/personal-access-tokens/new),
+   restrict it to **only this repository**, and give it one permission —
+   **Contents: Read and write**.
+3. Paste it in and press **Save and test**. It tells you whether it worked.
+4. Repeat on your other device. That is it.
 
----
+### What happens day to day
+
+- Changes upload a couple of seconds after you make them.
+- Coming back to the page pulls down whatever your other device did.
+- Log while offline at the range and it uploads as soon as you have signal.
+- The dot next to the theme button shows the state: green synced, blue syncing,
+  amber offline, red failed. Tap it to sync immediately.
+
+### Honest caveats
+
+- **The token is a password.** Anyone who has it can change that one repository.
+  Do not paste it anywhere else. If it leaks, delete it on GitHub and make a new
+  one — nothing else is affected.
+- **Tokens expire.** When yours does, sync starts failing and you make a new one.
+- **Your log is public** if the repo is public. That was a deliberate choice;
+  make the repo private if you change your mind, though then only you can read it.
+- **Simultaneous edits are merged, not lost.** Each session carries an edit time;
+  the newer edit wins, deletions are remembered so they do not come back, and if
+  two devices write at the same moment one retries. Settings move as a block, so
+  the last device to change a setting wins for all of them.
+
+### Without sync
+
+Everything still works — the log just stays in one browser, under the key
+`archery-tracker:v1`. To move it around:
+
+- **Share a snapshot** packs your data into the link itself, after the `#`. That
+  part is never sent to any server. Open it elsewhere and press *Keep this on
+  this device*.
+- **Download backup** writes a `.json`; *Restore from file* reads it back,
+  merging or replacing.
+- **Export CSV** for spreadsheets.
+
+Take a backup occasionally either way. Clearing your browser's site data erases
+a local-only log, and nobody else has a copy.
 
 ## How the training plan works
 
@@ -173,13 +217,15 @@ None of this is a substitute for a coach, and your body outranks the plan.
 ```
 index.html               the whole app shell
 css/app.css              styling, light and dark
-js/store.js              data model, storage, import/export, share links
+js/store.js              data model, storage, merging, import/export, share links
+js/sync.js               GitHub-as-database sync
 js/parse.js              natural-language entry parser
 js/plan.js               periodisation and session templates
 js/charts.js             hand-rolled SVG charts (no chart library)
 js/views.js              dashboard, log and plan screens
 js/views2.js             calendar, gear and settings screens
 js/app.js                routing, dialogs, wiring
+tests/                   plain-node tests, see tests/README.md
 sw.js                    service worker, for offline use
 manifest.webmanifest     makes it installable on a phone
 icons/                   app icons

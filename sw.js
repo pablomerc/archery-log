@@ -1,9 +1,9 @@
 /* sw.js — caches the app shell so it opens instantly and works with no signal
    (club fields have famously bad reception). Data never leaves localStorage. */
-var CACHE = 'archery-log-v2';
+var CACHE = 'archery-log-v3';
 var SHELL = [
   './', './index.html', './css/app.css',
-  './js/store.js', './js/parse.js', './js/plan.js', './js/charts.js',
+  './js/store.js', './js/sync.js', './js/parse.js', './js/plan.js', './js/charts.js',
   './js/views.js', './js/views2.js', './js/app.js',
   './manifest.webmanifest', './icons/icon.svg'
 ];
@@ -32,6 +32,8 @@ self.addEventListener('fetch', function (e) {
   if (e.request.method !== 'GET') return;
   var url = new URL(e.request.url);
   if (url.origin !== location.origin) return;
+  // Never serve a cached copy of the log or of anything from GitHub.
+  if (/\/data\/log\.json$/.test(url.pathname)) return;
   e.respondWith(
     fetch(e.request, { cache: 'no-cache' }).then(function (res) {
       var copy = res.clone();

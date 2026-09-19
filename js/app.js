@@ -24,7 +24,9 @@
     newString: newString,
     download: download,
     importFile: importFile,
-    confirm: confirmDlg
+    confirm: confirmDlg,
+    syncNow: syncNow,
+    syncState: function () { return Sync.state(); }
   };
 
   /* ---------- plan ---------- */
@@ -273,14 +275,14 @@
         class: 'btn primary', onclick: function () {
           var st = Store.get();
           st.planOverrides[ps.date] = Math.max(0, parseInt(n.value, 10) || 0);
-          Store.save(); dlg.close(); toast('Target adjusted'); render();
+          Store.touchSettings(); Store.save(); dlg.close(); toast('Target adjusted'); render();
         }
       }, ['Save']),
       h('button', {
         class: 'btn ghost', onclick: function () {
           var st = Store.get();
           delete st.planOverrides[ps.date];
-          Store.save(); dlg.close(); toast('Back to the suggested target'); render();
+          Store.touchSettings(); Store.save(); dlg.close(); toast('Back to the suggested target'); render();
         }
       }, ['Reset to suggestion'])
     ]);
@@ -410,6 +412,107 @@
     return true;
   }
 
+  /* ---------- sync ---------- */
+  var pushTimer = null;
+
+  function syncNow(opts) {
+    return Sync.sync(opts || {}).then(function (r) {
+      if (r && r.changed) render();
+      return r;
+    });
+  }
+
+  /* Local edits are pushed on a short delay so a burst of changes
+     (editing three fields in a dialog) becomes one commit, not three. */
+  function schedulePush() {
+    if (!Sync.canWrite()) { if (Sync.hasRepo()) Sync.markDirty(); return; }
+    Sync.markDirty();
+    clearTimeout(pushTimer);
+    pushTimer = setTimeout(function () { syncNow({ push: true }); }, 2500);
+  }
+
+  function renderSyncChip(st) {
+    var chip = document.getElementById('syncChip');
+    if (!chip) return;
+    if (!st.hasRepo) { chip.setAttribute('hidden', 'hidden'); return; }
+    chip.removeAttribute('hidden');
+    chip.dataset.status = st.status;
+    var label = {
+      idle: st.dirty ? 'Unsaved' : 'Synced',
+      syncing: 'Syncing',
+      error: 'Sync failed',
+      offline: 'Offline',
+      readonly: 'Read only',
+      off: ''
+    }[st.status] || '';
+    chip.innerHTML = '<span class="sync-text">' + U.esc(label) + '</span>';
+    chip.title = st.status === 'error' ? (st.error || 'Sync failed') :
+      st.status === 'readonly' ? 'Viewing the shared log. Add a token under You to save from this device.' :
+        st.lastSync ? 'Last synced ' + new Date(st.lastSync).toLocaleTimeString() : 'Not synced yet';
+  }
+
+  function wireSync() {
+    Sync.init();
+    Sync.onChange(renderSyncChip);
+    renderSyncChip(Sync.state());
+
+    document.getElementById('syncChip').addEventListener('click', function () {
+      var st = Sync.state();
+      if (st.status === 'error') { toast(st.error || 'Sync failed'); }
+      syncNow({ push: st.canWrite });
+    });
+
+    if (!Sync.hasRepo()) return;
+
+    /* Without a token this is somebody else's log (or your own, on a device you
+       have not set up yet). Show it, but never merge it into this browser's
+       own data — that would quietly overwrite a visitor's log with yours. */
+    if (!Sync.canWrite()) { viewRemote(); return; }
+
+    syncNow();                                    // catch up on whatever happened elsewhere
+    Store.subscribe(schedulePush);                // push local edits
+    global.addEventListener('online', function () { syncNow({ push: true }); });
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden) syncNow();            // pull whatever the other device did
+    });
+    setInterval(function () { if (!document.hidden) syncNow(); }, 120000);
+    /* A pending push must not be lost if the tab closes first. */
+    global.addEventListener('pagehide', function () {
+      if (Sync.state().dirty && Sync.canWrite()) { clearTimeout(pushTimer); syncNow({ push: true }); }
+    });
+  }
+
+  function viewRemote() {
+    Sync.peek().then(function (remote) {
+      if (!remote || !remote.sessions || !remote.sessions.length) return;
+      var owner = (remote.settings && remote.settings.archer) || Sync.config().owner;
+      var total = remote.sessions.reduce(function (n, x) { return n + (x.arrows || 0); }, 0);
+      var hadOwnData = Store.get().sessions.length > 0;
+
+      Store.adoptState(Store.fromPayload(remote));
+      viewingShared = true;
+      render();
+
+      clear(document.getElementById('shareBanner')).appendChild(h('div', { class: 'banner' }, [
+        h('strong', { text: 'Viewing ' + owner + '\u2019s log' }),
+        h('div', { style: 'font-size:.87rem;margin-top:3px', text:
+          remote.sessions.length + ' sessions, ' + total.toLocaleString() + ' arrows. Read only \u2014 nothing you do here is saved to GitHub.' +
+          (hadOwnData ? ' Your own log on this device is untouched.' : '') }),
+        h('div', { class: 'btn-row' }, [
+          h('button', { class: 'btn primary sm', onclick: function () { go('settings'); } }, ['This is mine \u2014 set up saving']),
+          h('button', {
+            class: 'btn sm', onclick: function () {
+              Sync.saveConfig({ enabled: false });
+              location.reload();
+            }
+          }, [hadOwnData ? 'Back to my own log' : 'Start my own log'])
+        ])
+      ]));
+    }).catch(function (e) {
+      console.info('Could not load the shared log:', e.message);
+    });
+  }
+
   /* ---------- theme ---------- */
   function applyTheme(t) {
     if (t === 'auto') document.documentElement.removeAttribute('data-theme');
@@ -465,6 +568,7 @@
 
     Store.subscribe(function () { /* re-render is driven explicitly by callers */ });
     go('dash');
+    wireSync();
 
     if ('serviceWorker' in navigator && location.protocol.indexOf('http') === 0) {
       navigator.serviceWorker.register('sw.js').catch(function (e) { console.info('Offline mode unavailable:', e.message); });

@@ -357,3 +357,35 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
   .view { display: block !important; }
   .card { break-inside: avoid; box-shadow: none; }
 }
+
+/* ---------- sync status chip ---------- */
+.sync-chip {
+  display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--text-dim); border-radius: 999px;
+  padding: 4px 11px 4px 9px; font: inherit; font-size: .75rem; font-weight: 620;
+  cursor: pointer; min-height: 30px; -webkit-tap-highlight-color: transparent;
+}
+.sync-chip:hover { background: var(--surface-2); color: var(--text); }
+/* An explicit display beats the user-agent [hidden] rule, so restore it. */
+.sync-chip[hidden] { display: none; }
+.sync-chip::before {
+  content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--text-faint); flex: none;
+}
+.sync-chip[data-status="idle"]::before { background: var(--green); }
+.sync-chip[data-status="syncing"]::before { background: var(--blue); animation: pulse 1s ease-in-out infinite; }
+.sync-chip[data-status="error"]::before { background: var(--red); }
+.sync-chip[data-status="offline"]::before { background: var(--amber); }
+.sync-chip[data-status="readonly"]::before { background: var(--blue); }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
+@media (max-width: 480px) { .sync-chip .sync-text { display: none; } .sync-chip { padding: 4px 9px; } }
+
+.step { display: flex; gap: 11px; padding: 9px 0; border-bottom: 1px solid var(--border); font-size: .9rem; }
+.step:last-child { border-bottom: 0; }
+.step .num {
+  flex: none; width: 21px; height: 21px; border-radius: 50%; background: var(--accent); color: #fff;
+  display: flex; align-items: center; justify-content: center; font-size: .72rem; font-weight: 700; margin-top: 1px;
+}
+.step .txt { flex: 1; min-width: 0; }
+.result { padding: 10px 12px; border-radius: var(--radius-sm); font-size: .86rem; margin-top: 10px; }
+.result.ok { background: color-mix(in srgb, var(--green) 14%, transparent); color: var(--green); }
+.result.bad { background: color-mix(in srgb, var(--red) 12%, transparent); color: var(--red); }

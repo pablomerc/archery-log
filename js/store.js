@@ -60,7 +60,10 @@
         notes: ''
       },
       planOverrides: {},             // { 'YYYY-MM-DD': arrows }  manual tweaks to generated plan
-      meta: { created: iso(today()), lastSaved: null }
+      /* Deletions have to be remembered, not just applied: without a tombstone
+         a row deleted here comes back from the other device on the next sync. */
+      deleted: { sessions: {}, competitions: {} },
+      meta: { created: iso(today()), lastSaved: null, settingsUpdated: null }
     };
   }
 
@@ -83,7 +86,17 @@
       out.gear.notes = raw.gear.notes || '';
     }
     out.planOverrides = raw.planOverrides && typeof raw.planOverrides === 'object' ? raw.planOverrides : {};
-    if (raw.meta) out.meta.created = raw.meta.created || out.meta.created;
+    if (raw.deleted) {
+      out.deleted.sessions = raw.deleted.sessions || {};
+      out.deleted.competitions = raw.deleted.competitions || {};
+    }
+    if (raw.meta) {
+      out.meta.created = raw.meta.created || out.meta.created;
+      out.meta.settingsUpdated = raw.meta.settingsUpdated || null;
+    }
+    // Records saved before sync existed have no clock; treat creation as the edit time.
+    out.sessions.forEach(function (x) { if (!x.updated) x.updated = x.created || new Date(0).toISOString(); });
+    out.competitions.forEach(function (x) { if (!x.updated) x.updated = new Date(0).toISOString(); });
     return out;
   }
 
@@ -126,12 +139,13 @@
       rpe: s.rpe ? Math.min(5, Math.max(1, Math.round(+s.rpe))) : null,
       score: (s.score && s.score.total != null) ? { total: +s.score.total, outOf: s.score.outOf ? +s.score.outOf : null, round: s.score.round || '' } : null,
       notes: s.notes || '',
-      created: s.created || new Date().toISOString()
+      created: s.created || new Date().toISOString(),
+      updated: s.updated || new Date().toISOString()
     };
   }
 
   function addSession(s) {
-    var rec = normaliseSession(s);
+    var rec = normaliseSession(Object.assign({}, s, { updated: new Date().toISOString() }));
     state.sessions.push(rec);
     sortSessions();
     save();
@@ -141,7 +155,7 @@
   function updateSession(id, patch) {
     var i = state.sessions.findIndex(function (s) { return s.id === id; });
     if (i < 0) return null;
-    var merged = Object.assign({}, state.sessions[i], patch, { id: id });
+    var merged = Object.assign({}, state.sessions[i], patch, { id: id, updated: new Date().toISOString() });
     state.sessions[i] = normaliseSession(merged);
     sortSessions();
     save();
@@ -150,6 +164,7 @@
 
   function removeSession(id) {
     state.sessions = state.sessions.filter(function (s) { return s.id !== id; });
+    state.deleted.sessions[id] = new Date().toISOString();
     save();
   }
 
@@ -179,7 +194,8 @@
       distance: c.distance ? +c.distance : null,
       notes: c.notes || '',
       result: c.result || null,      // {score, outOf, place, fieldSize}
-      checklist: c.checklist || null
+      checklist: c.checklist || null,
+      updated: new Date().toISOString()
     };
     state.competitions.push(rec);
     state.competitions.sort(function (a, b) { return a.date < b.date ? -1 : 1; });
@@ -190,7 +206,7 @@
   function updateCompetition(id, patch) {
     var i = state.competitions.findIndex(function (c) { return c.id === id; });
     if (i < 0) return null;
-    state.competitions[i] = Object.assign({}, state.competitions[i], patch, { id: id });
+    state.competitions[i] = Object.assign({}, state.competitions[i], patch, { id: id, updated: new Date().toISOString() });
     state.competitions.sort(function (a, b) { return a.date < b.date ? -1 : 1; });
     save();
     return state.competitions[i];
@@ -198,6 +214,7 @@
 
   function removeCompetition(id) {
     state.competitions = state.competitions.filter(function (c) { return c.id !== id; });
+    state.deleted.competitions[id] = new Date().toISOString();
     save();
   }
 
@@ -300,6 +317,7 @@
     state.gear.strings.forEach(function (s) { s.retired = s.retired || iso(today()); });
     var rec = { id: uid(), name: name || 'String ' + (state.gear.strings.length + 1), installedAt: lifetimeArrows(), installedOn: iso(today()), retired: null };
     state.gear.strings.push(rec);
+    touchSettings();
     save();
     return rec;
   }
@@ -308,16 +326,21 @@
     if (i >= 0) { state.gear.sightMarks[i].mark = mark; state.gear.sightMarks[i].note = note || ''; }
     else state.gear.sightMarks.push({ id: uid(), distance: +distance, mark: mark, note: note || '' });
     state.gear.sightMarks.sort(function (a, b) { return a.distance - b.distance; });
+    touchSettings();
     save();
   }
   function removeSightMark(id) {
     state.gear.sightMarks = state.gear.sightMarks.filter(function (m) { return m.id !== id; });
+    touchSettings();
     save();
   }
 
   /* ---------- settings ---------- */
+  function touchSettings() { state.meta.settingsUpdated = new Date().toISOString(); }
+
   function setSettings(patch) {
     Object.assign(state.settings, patch);
+    touchSettings();
     save();
   }
 
@@ -425,6 +448,80 @@
   function adoptState(s) { state = s; emit(); }   // view a shared snapshot without saving
   function commitAdopted() { save(); }            // ...then keep it
 
+  /* ---------- merging two devices' copies ----------
+     Rules, in order:
+       - a record edited more recently wins (per record, not per file)
+       - a record deleted more recently than it was edited stays deleted
+       - a record edited more recently than it was deleted comes back
+       - settings, gear and plan overrides move as one block, newest wins
+     Tombstones are pruned after a year; by then every device has seen them. */
+  function mergeStates(local, remote) {
+    var out = JSON.parse(JSON.stringify(local));
+    if (!remote || typeof remote !== 'object') return out;
+
+    ['sessions', 'competitions'].forEach(function (kind) {
+      var ld = out.deleted[kind] || {};
+      var rd = (remote.deleted && remote.deleted[kind]) || {};
+      Object.keys(rd).forEach(function (id) {
+        if (!ld[id] || rd[id] > ld[id]) ld[id] = rd[id];
+      });
+      out.deleted[kind] = ld;
+
+      var byId = {};
+      (local[kind] || []).forEach(function (r) { byId[r.id] = r; });
+      (remote[kind] || []).forEach(function (r) {
+        var cur = byId[r.id];
+        if (!cur || (r.updated || '') > (cur.updated || '')) byId[r.id] = r;
+      });
+
+      out[kind] = Object.keys(byId)
+        .filter(function (id) {
+          var killedAt = ld[id];
+          return !killedAt || (byId[id].updated || '') > killedAt;
+        })
+        .map(function (id) { return byId[id]; });
+    });
+
+    out.sessions = out.sessions.map(normaliseSession);
+    out.sessions.sort(function (a, b) {
+      if (a.date === b.date) return (a.created || '').localeCompare(b.created || '');
+      return a.date < b.date ? -1 : 1;
+    });
+    out.competitions.sort(function (a, b) { return a.date < b.date ? -1 : 1; });
+
+    var localClock = (local.meta && local.meta.settingsUpdated) || '';
+    var remoteClock = (remote.meta && remote.meta.settingsUpdated) || '';
+    if (remoteClock > localClock) {
+      out.settings = Object.assign(defaults().settings, remote.settings || {});
+      out.gear = remote.gear || out.gear;
+      out.planOverrides = remote.planOverrides || out.planOverrides;
+      out.meta.settingsUpdated = remoteClock;
+    }
+
+    var cutoff = new Date(Date.now() - 365 * 86400000).toISOString();
+    ['sessions', 'competitions'].forEach(function (kind) {
+      Object.keys(out.deleted[kind]).forEach(function (id) {
+        if (out.deleted[kind][id] < cutoff) delete out.deleted[kind][id];
+      });
+    });
+
+    if (remote.meta && remote.meta.created && remote.meta.created < out.meta.created) {
+      out.meta.created = remote.meta.created;
+    }
+    return out;
+  }
+
+  /* Replace local state with the merged result. Returns true if anything moved,
+     so the caller knows whether a re-render or a push is needed. */
+  function applyMerge(remote) {
+    var before = JSON.stringify([state.sessions, state.competitions, state.settings, state.gear, state.planOverrides, state.deleted]);
+    var merged = mergeStates(state, remote);
+    var after = JSON.stringify([merged.sessions, merged.competitions, merged.settings, merged.gear, merged.planOverrides, merged.deleted]);
+    state = merged;
+    if (before !== after) { save(); return true; }
+    return false;
+  }
+
   function toCSV() {
     var head = ['date', 'arrows', 'set_size', 'minutes', 'distance', 'type', 'rpe', 'score', 'score_out_of', 'notes'];
     var rows = state.sessions.map(function (s) {
@@ -446,7 +543,8 @@
     activeString: activeString, stringArrows: stringArrows, addString: addString,
     setSightMark: setSightMark, removeSightMark: removeSightMark,
     setSettings: setSettings,
-    exportJSON: exportJSON, importJSON: importJSON, toCSV: toCSV,
+    exportJSON: exportJSON, importJSON: importJSON, toCSV: toCSV, fromPayload: migrate,
+    mergeStates: mergeStates, applyMerge: applyMerge, touchSettings: touchSettings,
     shareURL: shareURL, readShareFragment: readShareFragment, adoptState: adoptState, commitAdopted: commitAdopted,
     uid: uid,
     date: {

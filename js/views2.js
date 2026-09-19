@@ -256,6 +256,103 @@
       h('div', { class: 'hint', text: 'Changing any of these regenerates the training plan. Targets you adjusted by hand are kept.' })
     ]));
 
+    /* ---- sync ---- */
+    (function () {
+      var sc = Sync.config();
+      var ss = Sync.state();
+
+      var ownerI = h('input', { type: 'text', value: sc.owner, placeholder: 'your-github-username', autocapitalize: 'off', spellcheck: 'false' });
+      var repoI = h('input', { type: 'text', value: sc.repo, placeholder: 'archery-log', autocapitalize: 'off', spellcheck: 'false' });
+      var branchI = h('input', { type: 'text', value: sc.branch, placeholder: 'main', autocapitalize: 'off', spellcheck: 'false' });
+      var tokenI = h('input', {
+        type: 'password', value: '', placeholder: sc.token ? '\u2022\u2022\u2022\u2022 saved on this device' : 'github_pat_...',
+        autocapitalize: 'off', spellcheck: 'false', autocomplete: 'off'
+      });
+      var out = h('div');
+
+      function statusLine() {
+        if (!ss.hasRepo) return 'Not set up. Fill this in and every device you own shares one log.';
+        if (!ss.canWrite) return 'Reading the shared log. Add a token below to save from this device too.';
+        return 'This device can read and save.' + (ss.lastSync ? ' Last synced ' + new Date(ss.lastSync).toLocaleString() + '.' : '');
+      }
+
+      var body = [
+        cardHead('Sync across devices', ss.hasRepo
+          ? h('span', { class: 'tag ' + (ss.canWrite ? 'volume' : 'taper'), text: ss.canWrite ? 'read + write' : 'read only' })
+          : null),
+        h('p', { class: 'muted', style: 'font-size:.9rem', text: statusLine() })
+      ];
+
+      if (sc.autodetected && sc.owner) {
+        body.push(h('div', { class: 'hint', text: 'Repository detected from this page\u2019s address: ' + sc.owner + '/' + sc.repo }));
+      }
+
+      body.push(h('hr', { class: 'sep' }));
+      body.push(h('div', { class: 'row' }, [
+        h('div', { class: 'field' }, [h('label', { text: 'GitHub username' }), ownerI]),
+        h('div', { class: 'field' }, [h('label', { text: 'Repository' }), repoI])
+      ]));
+      body.push(h('div', { class: 'field' }, [h('label', { text: 'Branch' }), branchI]));
+
+      body.push(h('details', { style: 'margin:6px 0 12px' }, [
+        h('summary', { style: 'cursor:pointer;font-size:.86rem;font-weight:620;color:var(--text-dim)', text: 'How to get a token' }),
+        h('div', { style: 'margin-top:9px' }, [
+          h('div', { class: 'step' }, [h('span', { class: 'num', text: '1' }), h('div', { class: 'txt', html: 'Open <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">github.com/settings/personal-access-tokens/new</a>' })]),
+          h('div', { class: 'step' }, [h('span', { class: 'num', text: '2' }), h('div', { class: 'txt', text: 'Give it a name and an expiry. A year is reasonable; you will need to replace it when it runs out.' })]),
+          h('div', { class: 'step' }, [h('span', { class: 'num', text: '3' }), h('div', { class: 'txt', html: 'Under <b>Repository access</b> choose <b>Only select repositories</b> and pick just this one.' })]),
+          h('div', { class: 'step' }, [h('span', { class: 'num', text: '4' }), h('div', { class: 'txt', html: 'Under <b>Permissions \u2192 Repository permissions</b>, set <b>Contents</b> to <b>Read and write</b>. Nothing else is needed.' })]),
+          h('div', { class: 'step' }, [h('span', { class: 'num', text: '5' }), h('div', { class: 'txt', text: 'Generate it, copy it, and paste it below. GitHub only shows it once.' })]),
+          h('div', { class: 'hint', text: 'The token is stored in this browser only and is never written into the repository. Anyone holding it could change that one repository, so do not paste it anywhere else. If it leaks, delete it on GitHub and make a new one.' })
+        ])
+      ]));
+
+      body.push(h('div', { class: 'field' }, [h('label', { text: sc.token ? 'Replace token' : 'Token' }), tokenI]));
+      body.push(h('div', { class: 'btn-row' }, [
+        h('button', {
+          class: 'btn primary', onclick: async function () {
+            var patch = {
+              owner: ownerI.value.trim().replace(/^@/, ''), repo: repoI.value.trim(),
+              branch: branchI.value.trim() || 'main', enabled: true
+            };
+            if (tokenI.value.trim()) patch.token = tokenI.value.trim();
+            Sync.saveConfig(patch);
+            tokenI.value = '';
+            clear(out).appendChild(h('div', { class: 'result', text: 'Checking\u2026' }));
+            var r = await Sync.testConnection();
+            clear(out).appendChild(h('div', { class: 'result ' + (r.ok ? 'ok' : 'bad'), text: r.message }));
+            if (r.ok) {
+              var res = await ctx.syncNow({ push: !!r.write });
+              if (res && res.ok) {
+                ctx.toast(res.pushed ? 'Saved to GitHub' : 'Up to date');
+                ctx.render();
+              }
+            }
+          }
+        }, ['Save and test']),
+        ss.hasRepo ? h('button', {
+          class: 'btn', onclick: async function () {
+            clear(out).appendChild(h('div', { class: 'result', text: 'Syncing\u2026' }));
+            var r = await ctx.syncNow({ push: Sync.canWrite() });
+            clear(out).appendChild(h('div', {
+              class: 'result ' + (r && r.ok ? 'ok' : 'bad'),
+              text: r && r.ok ? (r.pushed ? 'Saved to GitHub.' : 'Already up to date.') : (r && r.error) || 'Sync failed.'
+            }));
+          }
+        }, ['Sync now']) : null,
+        sc.token ? h('button', {
+          class: 'btn danger', onclick: function () {
+            ctx.confirm('Remove the token from this device?', 'The log stays on GitHub and this device can still read it, but it will no longer save changes.', function () {
+              Sync.forgetToken(); ctx.toast('Token removed'); ctx.render();
+            });
+          }
+        }, ['Remove token']) : null
+      ].filter(Boolean)));
+      body.push(out);
+      body.push(h('div', { class: 'hint', text: 'Changes are saved a couple of seconds after you make them, and pulled again whenever you come back to the page. Log while offline and it uploads once you have signal.' }));
+
+      root.appendChild(card(body));
+    })();
+
     /* ---- sharing & backup ---- */
     var shareOut = h('textarea', { class: 'share-box', readonly: true, rows: '3', hidden: 'hidden' });
     root.appendChild(card([
