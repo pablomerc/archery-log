@@ -80,26 +80,79 @@
         h('div', { class: 'hint', text: monthArrows ? monthArrows.toLocaleString() + ' arrows across ' + monthSessions + ' sessions this month.' : 'Nothing logged this month yet.' })
       ]));
 
-      /* upcoming */
-      var upcoming = st.competitions.filter(function (c) { return c.date >= todayISO; });
-      root.appendChild(card([
-        cardHead('Coming up', h('button', { class: 'btn ghost sm', onclick: function () { ctx.addCompetition(); } }, ['+ Competition'])),
-        upcoming.length ? h('ul', { class: 'list' }, upcoming.map(function (c) {
-          var days = D.daysBetween(todayISO, c.date);
-          return h('li', {}, [
-            h('div', { class: 'when', text: D.fmtShort(c.date) }),
-            h('div', { class: 'main' }, [
-              h('div', { class: 'title', text: c.name }),
-              h('div', { class: 'meta', text: [c.location, c.round, c.distance ? c.distance + 'm' : ''].filter(Boolean).join(' · ') || D.fmtLong(c.date) })
-            ]),
-            h('div', { class: 'amt', style: 'font-size:.82rem', text: days === 0 ? 'today' : days + 'd' }),
-            h('button', { class: 'btn ghost sm', onclick: function () { ctx.addCompetition(c); } }, ['⋯'])
-          ]);
-        })) : empty('Nothing on the calendar.', 'Add a competition to start a plan.')
-      ]));
+      root.appendChild(competitionList(ctx));
     }
     draw();
   };
+
+  /* ---------- the competition schedule, as a plain list ---------- */
+  /* Shared with the Plan tab so there is exactly one competition list in the app. */
+  function competitionList(ctx) {
+    var st = ctx.state;
+    var todayISO = D.iso(D.today());
+    var comps = st.competitions.slice().sort(function (a, b) { return a.date < b.date ? -1 : 1; });
+    var upcoming = comps.filter(function (c) { return c.date >= todayISO; });
+    var past = comps.filter(function (c) { return c.date < todayISO; }).reverse();
+
+    if (!comps.length) {
+      return card([
+        cardHead('Competitions', h('button', { class: 'btn primary sm', onclick: function () { ctx.addCompetition(); } }, ['+ Add'])),
+        empty('Nothing on the calendar.', 'Add a competition and the plan builds itself around the date.')
+      ]);
+    }
+
+    /* A list rather than a table: on a phone a six-column table either scrolls
+       sideways or wraps every cell into a tall unreadable block. */
+    function row(c) {
+      var days = D.daysBetween(todayISO, c.date);
+      var d = D.parseISO(c.date);
+      var when = days === 0 ? 'Today' : days > 0 ? 'in ' + days + ' days' : Math.abs(days) + ' days ago';
+      var meta = [c.location, c.round].filter(Boolean);
+
+      return h('li', {
+        class: 'comp-row' + (days < 0 ? ' past' : ''), tabindex: '0', role: 'button',
+        onclick: function () { ctx.addCompetition(c); },
+        onkeydown: function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); ctx.addCompetition(c); } }
+      }, [
+        h('div', { class: 'comp-date' }, [
+          h('div', { class: 'm', text: d.toLocaleDateString(undefined, { month: 'short' }).toUpperCase() }),
+          h('div', { class: 'dd', text: d.getDate() }),
+          h('div', { class: 'y', text: D.dowName(d.getDay()) + ' ' + d.getFullYear() })
+        ]),
+        h('div', { class: 'comp-body' }, [
+          h('div', { class: 'comp-name', text: c.name }),
+          meta.length ? h('div', { class: 'comp-meta', text: meta.join(' \u00b7 ') }) : null,
+          h('div', { class: 'comp-tags' }, [
+            c.confirmed === false
+              ? h('span', { class: 'tag scoring', text: 'date estimated' })
+              : h('span', { class: 'tag volume', text: 'confirmed' }),
+            c.priority === 'B' ? h('span', { class: 'tag', text: 'shoot through' }) : h('span', { class: 'tag taper', text: 'target event' }),
+            h('span', { class: 'comp-when', text: when }),
+            c.result && c.result.score
+              ? h('strong', { style: 'margin-left:auto', text: c.result.score + (c.result.place ? ' \u00b7 ' + ordinal(c.result.place) : '') })
+              : c.url ? h('a', {
+                href: c.url, target: '_blank', rel: 'noopener', style: 'margin-left:auto',
+                onclick: function (e) { e.stopPropagation(); }, text: 'entry \u2197'
+              }) : null
+          ])
+        ])
+      ]);
+    }
+
+    var anyEstimated = comps.some(function (c) { return c.confirmed === false; });
+
+    return card([
+      cardHead('Competition schedule',
+        h('button', { class: 'btn ghost sm', onclick: function () { ctx.addCompetition(); } }, ['+ Add'])),
+      h('ul', { class: 'comp-list' }, upcoming.map(row)),
+      anyEstimated ? h('div', { class: 'hint', text: 'Events marked "date estimated" have not published a date for this season yet \u2014 those are the best guess from previous years. Check the entry link before booking anything.' }) : null,
+      past.length ? h('details', { style: 'margin-top:12px' }, [
+        h('summary', { style: 'cursor:pointer;font-size:.86rem;font-weight:620;color:var(--text-dim)', text: past.length + ' past ' + (past.length === 1 ? 'competition' : 'competitions') }),
+        h('ul', { class: 'comp-list', style: 'margin-top:6px' }, past.map(row))
+      ]) : null,
+      h('div', { class: 'hint', text: 'Tap any event to edit it, record a result, or change whether the plan tapers for it.' })
+    ]);
+  }
 
   /* =========================================================
      GEAR
@@ -405,4 +458,5 @@
       }, ['Erase all data'])
     ]));
   };
+  global.CompetitionList = competitionList;
 })(window);

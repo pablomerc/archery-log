@@ -454,3 +454,26 @@ table.sheet td.num { text-align: right; }
 table.sheet tbody tr { cursor: pointer; }
 table.sheet tbody tr:hover { background: var(--surface-2); }
 table.sheet tbody tr:last-child td { border-bottom: 0; }
+
+/* ---------- competition schedule ---------- */
+.comp-list { list-style: none; margin: 0; padding: 0; }
+.comp-row {
+  display: flex; gap: 13px; padding: 13px 0; border-bottom: 1px solid var(--border);
+  cursor: pointer; -webkit-tap-highlight-color: transparent; align-items: flex-start;
+}
+.comp-row:last-child { border-bottom: 0; }
+.comp-row:hover { background: var(--surface-2); }
+.comp-row.past { opacity: .55; }
+.comp-date {
+  flex: none; width: 54px; text-align: center; line-height: 1.1;
+  border-right: 1px solid var(--border); padding-right: 11px;
+}
+.comp-date .m { font-size: .64rem; font-weight: 800; letter-spacing: .06em; color: var(--accent); }
+.comp-date .dd { font-size: 1.45rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.comp-date .y { font-size: .62rem; color: var(--text-faint); font-weight: 600; margin-top: 1px; }
+.comp-body { flex: 1; min-width: 0; }
+.comp-name { font-weight: 660; line-height: 1.25; }
+.comp-meta { font-size: .8rem; color: var(--text-dim); margin-top: 2px; }
+.comp-tags { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 7px; }
+.comp-when { font-size: .76rem; color: var(--text-faint); font-weight: 600; }
+.comp-tags a { font-size: .78rem; font-weight: 620; white-space: nowrap; }

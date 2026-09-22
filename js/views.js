@@ -554,34 +554,9 @@
     renderCompList(root, ctx);
   };
 
+  /* The Plan tab shows the same schedule table as the Calendar tab. */
   function renderCompList(root, ctx) {
-    var comps = ctx.state.competitions;
-    var todayISO = D.iso(D.today());
-    root.appendChild(card([
-      cardHead('Competitions', h('button', { class: 'btn ghost sm', onclick: function () { ctx.addCompetition(); } }, ['+ Add'])),
-      comps.length ? h('ul', { class: 'list' }, comps.slice().reverse().map(function (c) {
-        var days = D.daysBetween(todayISO, c.date);
-        var bits = [];
-        if (c.location) bits.push(c.location);
-        if (c.round) bits.push(c.round);
-        if (c.distance) bits.push(c.distance + 'm');
-        if (c.result && c.result.score) bits.push('scored ' + c.result.score + (c.result.place ? ' · ' + ordinal(c.result.place) : ''));
-        if (c.confirmed === false) bits.unshift('date not published — estimated');
-        return h('li', {}, [
-          h('div', { class: 'when', text: D.fmtShort(c.date) }),
-          h('div', { class: 'main' }, [
-            h('div', { class: 'title' }, [
-              h('span', { text: c.name + ' ' }),
-              c.priority === 'B' ? h('span', { class: 'tag', text: 'B' }) : null,
-              c.confirmed === false ? h('span', { class: 'tag scoring', text: 'est.' }) : null
-            ]),
-            h('div', { class: 'meta', text: bits.join(' · ') || '—' })
-          ]),
-          h('div', { class: 'amt', style: 'font-size:.8rem;color:var(--text-faint)', text: days > 0 ? 'in ' + days + 'd' : days === 0 ? 'today' : Math.abs(days) + 'd ago' }),
-          h('button', { class: 'btn ghost sm', onclick: function () { ctx.addCompetition(c); } }, ['⋯'])
-        ]);
-      })) : empty('No competitions yet.', 'Add one and the plan builds itself backwards from the date.')
-    ]));
+    if (global.CompetitionList) { root.appendChild(global.CompetitionList(ctx)); return; }
   }
   function ordinal(n) {
     var s = ['th', 'st', 'nd', 'rd'], v = n % 100;

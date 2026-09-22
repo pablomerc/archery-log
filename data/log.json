@@ -1,0 +1,259 @@
+{
+  "schema": 1,
+  "settings": {
+    "archer": "Pablo",
+    "bow": "recurve",
+    "practiceDays": [
+      1,
+      6
+    ],
+    "sessionMinutes": 120,
+    "baseArrows": 60,
+    "defaultSetSize": 3,
+    "defaultDistance": 18,
+    "units": "m",
+    "rampPerWeek": 0.08,
+    "seasonName": "Project Triplete",
+    "seasonEnd": "2027-04-18",
+    "maxPerSession": 100,
+    "maxDays": 3,
+    "maxWeekly": 300,
+    "theme": "auto"
+  },
+  "sessions": [
+    {
+      "id": "muc4jguy7866q",
+      "date": "2026-09-19",
+      "arrows": 65,
+      "setSize": 3,
+      "minutes": null,
+      "distance": 18,
+      "type": "scoring",
+      "rpe": null,
+      "score": {
+        "total": 285,
+        "outOf": 300,
+        "round": "10 ends × 3",
+        "xs": 16
+      },
+      "card": {
+        "arrowsPerEnd": 3,
+        "ends": [
+          {
+            "a": [
+              "10",
+              "9",
+              "9"
+            ],
+            "xs": 1
+          },
+          {
+            "a": [
+              "10",
+              "9",
+              "9"
+            ],
+            "xs": 1
+          },
+          {
+            "a": [
+              "10",
+              "10",
+              "10"
+            ],
+            "xs": 3
+          },
+          {
+            "a": [
+              "10",
+              "9",
+              "9"
+            ],
+            "xs": 1
+          },
+          {
+            "a": [
+              "10",
+              "10",
+              "8"
+            ],
+            "xs": 2
+          },
+          {
+            "a": [
+              "10",
+              "10",
+              "9"
+            ],
+            "xs": 2
+          },
+          {
+            "a": [
+              "10",
+              "9",
+              "9"
+            ],
+            "xs": 1
+          },
+          {
+            "a": [
+              "10",
+              "9",
+              "9"
+            ],
+            "xs": 1
+          },
+          {
+            "a": [
+              "10",
+              "10",
+              "10"
+            ],
+            "xs": 3
+          },
+          {
+            "a": [
+              "10",
+              "9",
+              "9"
+            ],
+            "xs": 1
+          }
+        ],
+        "round": "",
+        "distance": 18,
+        "face": ""
+      },
+      "notes": "Scoring round, entered from the paper card",
+      "created": "2026-09-22T03:38:21.082Z",
+      "updated": "2026-09-22T03:38:21.079Z"
+    },
+    {
+      "id": "muc4jguz5qzls",
+      "date": "2026-09-21",
+      "arrows": 60,
+      "setSize": 3,
+      "minutes": null,
+      "distance": 18,
+      "type": "volume",
+      "rpe": null,
+      "score": null,
+      "card": null,
+      "notes": "",
+      "created": "2026-09-22T03:38:21.083Z",
+      "updated": "2026-09-22T03:38:21.083Z"
+    }
+  ],
+  "competitions": [
+    {
+      "id": "muc4jguzu88no",
+      "date": "2026-11-21",
+      "name": "CT State Indoor Championship",
+      "location": "Connecticut (venue rotates)",
+      "round": "WA 18m, 60 arrows",
+      "distance": 18,
+      "notes": "2026-27 date NOT published. Estimated from 2025 (Nov 22-23); the 2024 edition was Dec 15, so this slot moves a lot. Venue also rotates (Eros Archery, Thomaston in 2025; Halls Arrow, Manchester in 2024). Check usarchery.org.",
+      "priority": "A",
+      "arrows": 60,
+      "url": "https://www.usarchery.org/events",
+      "confirmed": false,
+      "result": null,
+      "checklist": null,
+      "updated": "2026-09-22T03:38:21.083Z"
+    },
+    {
+      "id": "muc4jguzd5qaz",
+      "date": "2027-01-21",
+      "name": "Lancaster Archery Classic",
+      "location": "Spooky Nook Sports, Manheim, PA",
+      "round": "60-arrow qualification, 18m, 40cm, X=11 (max 660), then head-to-head",
+      "distance": 18,
+      "notes": "Jan 21-24 2027 (Jan 20 is registration and practice only). Confirmed; registration already open. Olympic Recurve is a full finals division. A perfect 660 pays $20,000.",
+      "priority": "B",
+      "arrows": 120,
+      "url": "https://www.lancasterarcheryclassic.com/register",
+      "confirmed": true,
+      "result": null,
+      "checklist": null,
+      "updated": "2026-09-22T03:38:21.083Z"
+    },
+    {
+      "id": "muc4jgv0wrbwx",
+      "date": "2027-02-06",
+      "name": "NH State Indoor Championship",
+      "location": "Pioneer Sportsmen Club, Dunbarton, NH",
+      "round": "WA 18m, 60 arrows",
+      "distance": 18,
+      "notes": "2027 date NOT published. Estimated from 2026 (Feb 7-8) and 2024 (Feb 10-11). Non-residents may shoot guest divisions, but state awards are residents-only.",
+      "priority": "A",
+      "arrows": 60,
+      "url": "https://www.usarchery.org/events",
+      "confirmed": false,
+      "result": null,
+      "checklist": null,
+      "updated": "2026-09-22T03:38:21.084Z"
+    },
+    {
+      "id": "muc4jgv0komko",
+      "date": "2027-03-11",
+      "name": "The Vegas Shoot",
+      "location": "Horseshoe / Paris / Planet Hollywood, Las Vegas, NV",
+      "round": "Vegas 900: 3 days x 30 arrows, 20yd, 40cm",
+      "distance": 18,
+      "notes": "Mar 11-14 2027, confirmed. Moved to MARCH for 2027, not February. Registration opens October 2026. Marked priority A despite being an extra: 3 days and 90 scoring arrows is the biggest physical load of the season, so the plan tapers for it. Change to B if you would rather shoot through it.",
+      "priority": "A",
+      "arrows": 150,
+      "url": "https://www.thevegasshoot.com/registration",
+      "confirmed": true,
+      "result": null,
+      "checklist": null,
+      "updated": "2026-09-22T03:38:21.084Z"
+    },
+    {
+      "id": "muc4jgv0sbno7",
+      "date": "2027-04-03",
+      "name": "MA State Indoor Championship",
+      "location": "Ashland Middle School, Ashland, MA",
+      "round": "WA 18m, 60 arrows (40cm single spot or 3-spot)",
+      "distance": 18,
+      "notes": "Apr 3-4 2027, confirmed. NOTE: Massachusetts has drifted later every year (2025 Jan 18-19, 2026 Mar 28-29, 2027 Apr 3-4) so it is now a SPRING event, outside the fall/winter window. Registration already open. Last leg of the Triplete.",
+      "priority": "A",
+      "arrows": 60,
+      "url": "https://usarchery.sport80.com/wizard/event/50822/home",
+      "confirmed": true,
+      "result": null,
+      "checklist": null,
+      "updated": "2026-09-22T03:38:21.084Z"
+    }
+  ],
+  "gear": {
+    "strings": [
+      {
+        "id": "muc4jgv0f02fo",
+        "name": "Current string",
+        "installedAt": 125,
+        "installedOn": "2026-09-21",
+        "retired": null
+      }
+    ],
+    "sightMarks": [
+      {
+        "id": "muc4jgv08jzq4",
+        "distance": 18,
+        "mark": "",
+        "note": "fill in your mark"
+      }
+    ],
+    "notes": ""
+  },
+  "planOverrides": {},
+  "deleted": {
+    "sessions": {},
+    "competitions": {}
+  },
+  "meta": {
+    "created": "2026-09-21",
+    "lastSaved": "2026-09-22T03:38:21.084Z",
+    "settingsUpdated": "2026-09-22T03:38:21.084Z"
+  }
+}

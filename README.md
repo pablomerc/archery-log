@@ -36,7 +36,9 @@ can shoot; it builds a session-by-session plan that ramps volume, then tapers so
 you arrive rested. Every session has a time-blocked structure and a focus. Any
 target can be overridden by hand.
 
-**Calendar.** Month view with what you shot, what is planned, and competitions.
+**Calendar.** Month view with what you shot, what is planned, and competitions,
+plus a competition schedule listing every event with its date, venue, round, and
+whether the date is confirmed or still a guess.
 
 **Scorecards.** Enter a round arrow by arrow on a keypad, laid out exactly like
 the paper card: ends down the side, arrows across, X's, end total and running
@@ -273,6 +275,7 @@ js/charts.js             hand-rolled SVG charts (no chart library)
 js/views.js              dashboard, log and plan screens
 js/views2.js             calendar, gear and settings screens
 js/app.js                routing, dialogs, wiring
+data/log.json            the log itself once sync is on (also the starting data)
 serve.py                 local dev server that does not cache
 tests/                   plain-node tests, see tests/README.md
 sw.js                    service worker, for offline use

@@ -38,6 +38,7 @@
 
   function axes(svg, x0, y0, x1, y1, max, ticks) {
     ticks = ticks || 4;
+    var last = null;
     for (var i = 0; i <= ticks; i++) {
       var v = max * i / ticks;
       var y = y1 - (y1 - y0) * (i / ticks);
@@ -45,7 +46,12 @@
         x1: x0, x2: x1, y1: y, y2: y,
         class: i === 0 ? 'grid grid-base' : 'grid'
       }));
-      svg.appendChild(el('text', { x: x0 - 6, y: y + 4, class: 'tick', 'text-anchor': 'end' }, Math.round(v)));
+      /* On a nearly empty chart the ticks round to the same number; drawing
+         "1 1 1 0 0" up the axis looks broken, so only label real steps. */
+      var label = Math.round(v);
+      if (label === last) continue;
+      last = label;
+      svg.appendChild(el('text', { x: x0 - 6, y: y + 4, class: 'tick', 'text-anchor': 'end' }, label));
     }
   }
 
@@ -57,7 +63,7 @@
     var padL = 34, padR = 6, padT = 12, padB = 26;
     var x0 = padL, x1 = f.w - padR, y0 = padT, y1 = f.h - padB;
 
-    var max = niceMax(Math.max(1, data.reduce(function (m, d) {
+    var max = niceMax(Math.max(10, data.reduce(function (m, d) {
       return Math.max(m, d.arrows || 0, d.planned || 0);
     }, 0)));
     axes(svg, x0, y0, x1, y1, max);
@@ -111,7 +117,7 @@
     var padL = 34, padR = 6, padT = 12, padB = 26;
     var x0 = padL, x1 = f.w - padR, y0 = padT, y1 = f.h - padB;
 
-    var max = niceMax(Math.max(1, weeks.reduce(function (m, w) {
+    var max = niceMax(Math.max(10, weeks.reduce(function (m, w) {
       return Math.max(m, w.arrows || 0, w.planned || 0);
     }, 0)));
     axes(svg, x0, y0, x1, y1, max);
@@ -160,7 +166,7 @@
       run += d.arrows || 0;
       return { i: i, v: run, date: d.date };
     });
-    var max = niceMax(Math.max(1, run));
+    var max = niceMax(Math.max(10, run));
     axes(svg, x0, y0, x1, y1, max);
 
     var sx = function (i) { return x0 + (x1 - x0) * (pts.length <= 1 ? 0.5 : i / (pts.length - 1)); };
@@ -196,7 +202,7 @@
       for (var j = from; j <= i; j++) sum += data[j].arrows || 0;
       return { i: i, v: sum, date: d.date };
     });
-    var max = niceMax(Math.max(1, vals.reduce(function (m, p) { return Math.max(m, p.v); }, 0)));
+    var max = niceMax(Math.max(10, vals.reduce(function (m, p) { return Math.max(m, p.v); }, 0)));
     axes(svg, x0, y0, x1, y1, max);
 
     var sx = function (i) { return x0 + (x1 - x0) * (vals.length <= 1 ? 0.5 : i / (vals.length - 1)); };

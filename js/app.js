@@ -576,27 +576,13 @@
   }
 
   /* ---------- first run ---------- */
-  var SEED_COMP = { date: '2026-10-11', name: 'First competition', distance: 18 };
-
-  function seedIfEmpty() {
-    var st = Store.get();
-    if (st.sessions.length || st.competitions.length) return;
-    // A starting competition so the plan has something to aim at on first open.
-    // Skipped once the date has passed, so a fresh copy of this app later does
-    // not open with a competition already in the past.
-    if (SEED_COMP.date <= D.iso(D.today())) return;
-    Store.addCompetition({
-      name: SEED_COMP.name, date: SEED_COMP.date, location: '', round: '',
-      distance: SEED_COMP.distance,
-      notes: 'Edit or replace this — the plan works backwards from whatever date is here.'
-    });
-  }
+  /* No placeholder data: a fresh install with sync configured pulls the real
+     log from the repo, and one without it starts genuinely empty. */
 
   /* ---------- boot ---------- */
   function boot() {
     Store.load();
-    var isShared = handleShareLink();
-    if (!isShared) seedIfEmpty();
+    handleShareLink();
     applyTheme(Store.get().settings.theme || 'auto');
 
     document.querySelectorAll('nav.tabs button').forEach(function (b) {
