@@ -12,12 +12,18 @@
     return n;
   }
 
+  /* Round the axis up to a friendly number. The steps are fine-grained enough
+     that a max of 240 tops out at 250 rather than 500 — a coarse ladder wastes
+     half the chart height on empty space. */
   function niceMax(v) {
     if (v <= 0) return 10;
     var mag = Math.pow(10, Math.floor(Math.log10(v)));
     var norm = v / mag;
-    var step = norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10;
-    return step * mag;
+    var steps = [1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10];
+    for (var i = 0; i < steps.length; i++) {
+      if (norm <= steps[i] + 1e-9) return steps[i] * mag;
+    }
+    return 10 * mag;
   }
 
   function frame(host, height) {
@@ -206,6 +212,49 @@
     host.appendChild(svg);
   }
 
+  /* Score history as a percentage of the maximum, so a 300 round and a 600
+     round sit on the same axis. */
+  function scoreLine(host, points, opts) {
+    opts = opts || {};
+    host.innerHTML = '';
+    var f = frame(host, opts.height || 190), svg = f.svg;
+    var padL = 36, padR = 10, padT = 16, padB = 26;
+    var x0 = padL, x1 = f.w - padR, y0 = padT, y1 = f.h - padB;
+
+    var vals = points.map(function (p) { return p.pct; });
+    var lo = Math.max(0, Math.floor((Math.min.apply(null, vals) - 4) / 5) * 5);
+    var hi = Math.min(100, Math.ceil((Math.max.apply(null, vals) + 4) / 5) * 5);
+    if (hi - lo < 10) { hi = Math.min(100, lo + 10); }
+
+    for (var i = 0; i <= 4; i++) {
+      var v = lo + (hi - lo) * i / 4;
+      var y = y1 - (y1 - y0) * (i / 4);
+      svg.appendChild(el('line', { x1: x0, x2: x1, y1: y, y2: y, class: i === 0 ? 'grid grid-base' : 'grid' }));
+      svg.appendChild(el('text', { x: x0 - 6, y: y + 4, class: 'tick', 'text-anchor': 'end' }, Math.round(v) + '%'));
+    }
+
+    var sx = function (i) { return x0 + (x1 - x0) * (points.length <= 1 ? 0.5 : i / (points.length - 1)); };
+    var sy = function (v) { return y1 - (y1 - y0) * ((v - lo) / (hi - lo || 1)); };
+    var d = points.map(function (p, i) { return (i ? 'L' : 'M') + sx(i).toFixed(1) + ' ' + sy(p.pct).toFixed(1); }).join(' ');
+    svg.appendChild(el('path', { d: d, class: 'line' }));
+
+    points.forEach(function (p, i) {
+      var c = el('circle', { cx: sx(i), cy: sy(p.pct), r: 4, class: 'line-dot' });
+      c.appendChild(el('title', {}, Store.date.fmtShort(p.date) + ': ' + p.label + ' (' + p.pct + '%)'));
+      svg.appendChild(c);
+    });
+
+    var showEvery = Math.max(1, Math.ceil(points.length / Math.max(2, Math.floor((x1 - x0) / 54))));
+    points.forEach(function (p, i) {
+      if (i % showEvery !== 0 && i !== points.length - 1) return;
+      svg.appendChild(el('text', {
+        x: sx(i), y: f.h - 8, class: 'tick',
+        'text-anchor': i === 0 ? 'start' : i === points.length - 1 ? 'end' : 'middle'
+      }, Store.date.fmtShort(p.date)));
+    });
+    host.appendChild(svg);
+  }
+
   /* Workload gauge for the acute:chronic ratio. */
   function gauge(host, ratio) {
     host.innerHTML = '';
@@ -243,5 +292,5 @@
     return ro;
   }
 
-  global.Charts = { daily: daily, weekly: weekly, cumulative: cumulative, rolling: rolling, gauge: gauge, responsive: responsive };
+  global.Charts = { daily: daily, weekly: weekly, cumulative: cumulative, rolling: rolling, gauge: gauge, scoreLine: scoreLine, responsive: responsive };
 })(window);

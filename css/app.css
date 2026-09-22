@@ -389,3 +389,68 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
 .result { padding: 10px 12px; border-radius: var(--radius-sm); font-size: .86rem; margin-top: 10px; }
 .result.ok { background: color-mix(in srgb, var(--green) 14%, transparent); color: var(--green); }
 .result.bad { background: color-mix(in srgb, var(--red) 12%, transparent); color: var(--red); }
+
+/* ---------- scorecards ---------- */
+.card-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 4px -4px; padding: 0 4px; }
+.card-scroll.tall { max-height: 58vh; overflow-y: auto; }
+table.card-grid { border-collapse: separate; border-spacing: 0; width: 100%; font-variant-numeric: tabular-nums; font-size: .9rem; }
+table.card-grid.compact { font-size: .84rem; }
+table.card-grid th {
+  font-size: .64rem; text-transform: uppercase; letter-spacing: .05em; color: var(--text-faint);
+  font-weight: 700; padding: 5px 2px; text-align: center; position: sticky; top: 0; background: var(--surface); z-index: 2;
+}
+table.card-grid td { padding: 0; text-align: center; border-bottom: 1px solid var(--border); height: 34px; }
+table.card-grid.compact td { height: 30px; }
+table.card-grid td.end-no { color: var(--text-faint); font-size: .74rem; font-weight: 640; width: 30px; }
+table.card-grid td.ar { width: 15%; font-weight: 640; }
+table.card-grid td.xs, table.card-grid td.tot { color: var(--text-dim); width: 13%; font-size: .84rem; }
+table.card-grid td.run { font-weight: 700; width: 15%; }
+table.card-grid tfoot td { border-bottom: 0; border-top: 2px solid var(--border); padding-top: 6px; font-weight: 700; height: 34px; }
+table.card-grid tfoot td.foot-label { text-align: right; padding-right: 8px; color: var(--text-dim); font-weight: 640; font-size: .8rem; }
+
+/* ring colours read like a target face */
+td.ring-gold { background: color-mix(in srgb, var(--gold) 26%, transparent); }
+td.ring-red { background: color-mix(in srgb, var(--accent) 22%, transparent); }
+td.ring-blue { background: color-mix(in srgb, var(--blue) 20%, transparent); }
+td.ring-black { background: color-mix(in srgb, var(--text) 14%, transparent); }
+td.ring-white { background: var(--surface-2); }
+td.ring-miss { background: color-mix(in srgb, var(--red) 16%, transparent); color: var(--red); }
+td.ring-empty { color: var(--text-faint); }
+td.active { outline: 2px solid var(--accent); outline-offset: -2px; }
+td .cell {
+  width: 100%; height: 100%; min-height: 30px; border: 0; background: none; color: inherit;
+  font: inherit; font-weight: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; padding: 0;
+}
+
+.keypad { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; margin: 12px 0 10px; }
+@media (max-width: 420px) { .keypad { grid-template-columns: repeat(5, 1fr); } }
+.keypad .key {
+  min-height: 42px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--surface); color: var(--text); font: inherit; font-weight: 680; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.keypad .key:active { transform: scale(.94); }
+.keypad .key.ring-gold { background: color-mix(in srgb, var(--gold) 24%, var(--surface)); }
+.keypad .key.ring-red { background: color-mix(in srgb, var(--accent) 20%, var(--surface)); }
+.keypad .key.ring-blue { background: color-mix(in srgb, var(--blue) 18%, var(--surface)); }
+.keypad .key.ring-black { background: color-mix(in srgb, var(--text) 12%, var(--surface)); }
+.keypad .key.ring-white { background: var(--surface-2); }
+.keypad .key.ring-miss { background: color-mix(in srgb, var(--red) 14%, var(--surface)); color: var(--red); }
+.keypad .key-back { background: var(--surface-2); color: var(--text-dim); }
+
+.card-summary { border-top: 1px solid var(--border); padding-top: 9px; }
+.card-summary-inner { display: flex; align-items: baseline; gap: 10px; }
+.card-summary-inner strong { font-size: 1.3rem; font-variant-numeric: tabular-nums; }
+
+/* ---------- spreadsheet-style tables ---------- */
+.table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -4px; padding: 0 4px; }
+table.sheet { border-collapse: collapse; width: 100%; font-size: .88rem; font-variant-numeric: tabular-nums; }
+table.sheet th {
+  font-size: .66rem; text-transform: uppercase; letter-spacing: .05em; color: var(--text-faint);
+  font-weight: 700; text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--border); white-space: nowrap;
+}
+table.sheet td { padding: 9px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+table.sheet td.num { text-align: right; }
+table.sheet tbody tr { cursor: pointer; }
+table.sheet tbody tr:hover { background: var(--surface-2); }
+table.sheet tbody tr:last-child td { border-bottom: 0; }

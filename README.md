@@ -38,6 +38,19 @@ target can be overridden by hand.
 
 **Calendar.** Month view with what you shot, what is planned, and competitions.
 
+**Scorecards.** Enter a round arrow by arrow on a keypad, laid out exactly like
+the paper card: ends down the side, arrows across, X's, end total and running
+total. Ring colours match the target face, so a card reads at a glance. Scores
+over time are plotted as a percentage of the maximum, so a 300 round and a 660
+Lancaster round sit on the same axis. Everything exports to CSV, one row per end.
+
+**Season plan.** Across a whole season and several competitions, planned in
+*weekly* arrow totals rather than fixed sessions — because real weeks move
+around, and 3×80 is the same week as 2×100+1×40 as far as your shoulder is
+concerned. Volume ramps, holds every fourth week, tapers before each target
+event and drops again the week after. Each week suggests a split; the number is
+what matters.
+
 **Gear.** String life counted in arrows (not weeks), sight marks, personal bests.
 
 **Sync.** Optional. Your repo becomes the database, so your phone and laptop stay
@@ -53,10 +66,15 @@ To run a local server instead (needed if you want the offline/installable
 behaviour to work):
 
 ```bash
-python3 -m http.server 8777
+python3 serve.py
 ```
 
 Then visit <http://localhost:8777>.
+
+Use `serve.py` rather than `python3 -m http.server`. The built-in server sends
+no cache headers, so browsers hang on to your old JavaScript and you end up
+editing a file while the page keeps running the previous version. `serve.py`
+sends `no-store`, so a reload is always a real reload.
 
 ---
 
@@ -186,6 +204,34 @@ Everything still works — the log just stays in one browser, under the key
 Take a backup occasionally either way. Clearing your browser's site data erases
 a local-only log, and nobody else has a copy.
 
+## Season plan: how the numbers are chosen
+
+Two planners work together. The **season plan** sets a weekly arrow target for
+every week between now and the last competition. The **competition plan** breaks
+the next event's remaining weeks into individual sessions with time blocks.
+
+The season plan:
+
+- **Ramps** weekly volume by a percentage chosen so it reaches your ceiling over
+  the training weeks actually available — never faster than 8% a week.
+- **Holds** every fourth build week flat instead of climbing.
+- **Tapers** to roughly 60% the week before an A-priority event and 70% the week
+  after, and treats the event week itself as the event's schedule, not yours.
+- **Peaks in the gaps** between competitions, because a stacked competition
+  calendar leaves no room to build — only to stay sharp.
+- **Winds down** after the last event rather than finishing on the biggest weeks
+  you have ever shot with nothing to use them for.
+- **Never exceeds** your stated ceiling for arrows per session or days per week.
+
+Mark an event **A** to get a taper and a recovery week around it, or **B** to
+shoot through it without reshaping the block. Events whose dates are not yet
+published can be marked **estimated**, and they show that way everywhere.
+
+If the plan cannot reach your weekly ceiling in the time available, it says so
+rather than pretending. That is the honest answer: between easy weeks, tapers
+and the competitions themselves, there are usually fewer clear building weeks
+than you would think.
+
 ## How the training plan works
 
 The plan is deliberately conservative, and it is a suggestion rather than a
@@ -220,11 +266,14 @@ css/app.css              styling, light and dark
 js/store.js              data model, storage, merging, import/export, share links
 js/sync.js               GitHub-as-database sync
 js/parse.js              natural-language entry parser
-js/plan.js               periodisation and session templates
+js/plan.js               session-by-session plan for one competition
+js/season.js             weekly plan across a whole season of competitions
+js/scores.js             scorecards: grid, keypad editor, Scores tab
 js/charts.js             hand-rolled SVG charts (no chart library)
 js/views.js              dashboard, log and plan screens
 js/views2.js             calendar, gear and settings screens
 js/app.js                routing, dialogs, wiring
+serve.py                 local dev server that does not cache
 tests/                   plain-node tests, see tests/README.md
 sw.js                    service worker, for offline use
 manifest.webmanifest     makes it installable on a phone

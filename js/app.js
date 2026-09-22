@@ -6,6 +6,7 @@
   var D = Store.date;
   global.__wireDate(D);
   global.__wireDate2(D);
+  global.__wireDate3(D);
 
   var current = 'dash';
   var viewingShared = false;
@@ -13,6 +14,7 @@
   var ctx = {
     state: null,
     plan: null,
+    season: null,
     pending: null,
     go: go,
     render: render,
@@ -30,6 +32,31 @@
   };
 
   /* ---------- plan ---------- */
+  function rebuildSeason() {
+    var st = Store.get();
+    var comps = st.competitions;
+    if (!comps.length) { ctx.season = null; return; }
+    var todayISO = D.iso(D.today());
+    var future = comps.filter(function (c) { return c.date >= todayISO; });
+    if (!future.length) { ctx.season = null; return; }
+    var last = future[future.length - 1];
+    var end = st.settings.seasonEnd && st.settings.seasonEnd > last.date
+      ? st.settings.seasonEnd
+      : D.iso(D.addDays(D.parseISO(last.date), 14));
+    ctx.season = Season.generate({
+      from: todayISO,
+      to: end,
+      competitions: future.map(function (c) {
+        return { date: c.date, name: c.name, priority: c.priority || 'A', arrows: c.arrows || null };
+      }),
+      startWeekly: st.settings.baseArrows * st.settings.practiceDays.length,
+      maxWeekly: st.settings.maxWeekly,
+      maxPerSession: st.settings.maxPerSession,
+      minDays: Math.min(st.settings.practiceDays.length, st.settings.maxDays),
+      maxDays: st.settings.maxDays
+    });
+  }
+
   function rebuildPlan() {
     var st = Store.get();
     var comp = Store.nextCompetition();
@@ -67,6 +94,7 @@
 
   function render() {
     ctx.state = Store.get();
+    rebuildSeason();
     rebuildPlan();
     var root = document.getElementById('view-' + current);
     if (!root || !Views[current]) return;
@@ -193,6 +221,15 @@
     var locI = h('input', { type: 'text', value: c.location || '', placeholder: 'Where' });
     var roundI = h('input', { type: 'text', value: c.round || '', placeholder: 'Portsmouth / WA 18 / 720' });
     var distI = h('input', { type: 'number', inputmode: 'numeric', value: c.distance || '', placeholder: '18' });
+    var prioI = h('select', {}, [
+      { v: 'A', t: 'A \u2014 target event (taper + recover)' },
+      { v: 'B', t: 'B \u2014 shoot through it' }
+    ].map(function (o) { return h('option', { value: o.v, selected: (c.priority || 'A') === o.v ? true : null, text: o.t }); }));
+    var arrowsI = h('input', { type: 'number', inputmode: 'numeric', value: c.arrows || '', placeholder: 'scoring arrows' });
+    var confI = h('select', {}, [
+      { v: '1', t: 'Confirmed' }, { v: '0', t: 'Estimated \u2014 date not published yet' }
+    ].map(function (o) { return h('option', { value: o.v, selected: (c.confirmed === false ? '0' : '1') === o.v ? true : null, text: o.t }); }));
+    var urlI = h('input', { type: 'text', value: c.url || '', placeholder: 'https://\u2026', autocapitalize: 'off', spellcheck: 'false' });
     var scoreI = h('input', { type: 'number', inputmode: 'numeric', value: c.result && c.result.score ? c.result.score : '', placeholder: 'after the event' });
     var placeI = h('input', { type: 'number', inputmode: 'numeric', value: c.result && c.result.place ? c.result.place : '', placeholder: 'e.g. 3' });
     var notesI = h('textarea', {}, [c.notes || '']);
@@ -206,6 +243,14 @@
       h('div', { class: 'row' }, [
         h('div', { class: 'field' }, [h('label', { text: 'Location' }), locI]),
         h('div', { class: 'field' }, [h('label', { text: 'Round' }), roundI])
+      ]),
+      h('div', { class: 'row' }, [
+        h('div', { class: 'field' }, [h('label', { text: 'Priority' }), prioI]),
+        h('div', { class: 'field' }, [h('label', { text: 'Date status' }), confI])
+      ]),
+      h('div', { class: 'row' }, [
+        h('div', { class: 'field' }, [h('label', { text: 'Scoring arrows' }), arrowsI]),
+        h('div', { class: 'field' }, [h('label', { text: 'Link' }), urlI])
       ]),
       h('div', { class: 'row' }, [
         h('div', { class: 'field' }, [h('label', { text: 'Score (after)' }), scoreI]),
@@ -239,6 +284,8 @@
           var payload = {
             name: nameI.value.trim(), date: dateI.value, location: locI.value.trim(),
             round: roundI.value.trim(), distance: distI.value || null, notes: notesI.value,
+            priority: prioI.value, arrows: arrowsI.value || null,
+            confirmed: confI.value === '1', url: urlI.value.trim(),
             result: scoreI.value || placeI.value ? { score: +scoreI.value || null, place: +placeI.value || null } : null,
             checklist: checklist
           };

@@ -50,6 +50,13 @@
         defaultDistance: 18,
         units: 'm',
         rampPerWeek: 0.08,
+        /* Season-level planning: the plan works in weekly totals and these are
+           the limits it must never exceed. */
+        seasonName: '',
+        seasonEnd: '',
+        maxPerSession: 100,
+        maxDays: 3,
+        maxWeekly: 300,
         theme: 'auto'
       },
       sessions: [],
@@ -126,8 +133,76 @@
   function subscribe(fn) { listeners.push(fn); return function () { listeners = listeners.filter(function (f) { return f !== fn; }); }; }
   function get() { return state; }
 
+  /* ---------- scorecards ----------
+     A card is arrow-by-arrow scoring for one round: ends of N arrows, each
+     arrow one of 'X', '10' … '1', 'M'. An end may carry an explicit X count
+     (xs) for cards copied off paper where the archer tallied X's separately. */
+  var ARROW_VALUES = ['X', '10', '9', '8', '7', '6', '5', '4', '3', '2', '1', 'M'];
+
+  function arrowValue(v) {
+    if (v === 'X') return 10;
+    if (v === 'M' || v == null || v === '') return 0;
+    var n = parseInt(v, 10);
+    return isNaN(n) ? 0 : Math.max(0, Math.min(10, n));
+  }
+
+  function normaliseCard(c) {
+    if (!c || !Array.isArray(c.ends)) return null;
+    var per = Math.max(1, Math.round(+c.arrowsPerEnd || (c.ends[0] && c.ends[0].a ? c.ends[0].a.length : 3)));
+    var ends = c.ends.map(function (e) {
+      var a = Array.isArray(e.a) ? e.a.slice(0, per) : [];
+      while (a.length < per) a.push('');
+      a = a.map(function (v) { return v == null ? '' : String(v).toUpperCase(); });
+      return { a: a, xs: (e.xs != null && e.xs !== '') ? Math.max(0, Math.round(+e.xs)) : null };
+    });
+    return {
+      arrowsPerEnd: per,
+      ends: ends,
+      round: c.round || '',
+      distance: c.distance ? +c.distance : null,
+      face: c.face || ''
+    };
+  }
+
+  function cardTotals(card) {
+    var ends = (card && card.ends) || [];
+    var per = (card && card.arrowsPerEnd) || 3;
+    var run = 0, xs = 0, tens = 0, shot = 0, rows = [];
+    ends.forEach(function (e, i) {
+      var a = e.a || [];
+      var t = a.reduce(function (n, v) { return n + arrowValue(v); }, 0);
+      var filled = a.filter(function (v) { return v != null && v !== ''; }).length;
+      var ex = e.xs != null ? e.xs : a.filter(function (v) { return v === 'X'; }).length;
+      run += t; xs += ex; shot += filled;
+      tens += a.filter(function (v) { return v === 'X' || v === '10'; }).length;
+      rows.push({ i: i, a: a, total: t, xs: ex, run: run, filled: filled, complete: filled === per });
+    });
+    var outOf = ends.length * per * 10;
+    return {
+      rows: rows, score: run, xs: xs, tens: tens, outOf: outOf, shot: shot, per: per,
+      ends: ends.length,
+      avg: shot ? run / shot : 0,
+      best: rows.reduce(function (m, r) { return Math.max(m, r.total); }, 0),
+      complete: shot === ends.length * per
+    };
+  }
+
+  function roundLabel(card) {
+    if (card.round) return card.round;
+    return card.ends.length + ' ends \u00d7 ' + card.arrowsPerEnd;
+  }
+
   /* ---------- sessions ---------- */
   function normaliseSession(s) {
+    var card = normaliseCard(s.card);
+    var score = (s.score && s.score.total != null)
+      ? { total: +s.score.total, outOf: s.score.outOf ? +s.score.outOf : null, round: s.score.round || '', xs: s.score.xs != null ? +s.score.xs : null }
+      : null;
+    if (card) {
+      // The card is the source of truth; the summary is derived from it.
+      var t = cardTotals(card);
+      score = { total: t.score, outOf: t.outOf, round: roundLabel(card), xs: t.xs };
+    }
     return {
       id: s.id || uid(),
       date: s.date,
@@ -137,7 +212,8 @@
       distance: s.distance ? +s.distance : null,
       type: s.type || 'volume',
       rpe: s.rpe ? Math.min(5, Math.max(1, Math.round(+s.rpe))) : null,
-      score: (s.score && s.score.total != null) ? { total: +s.score.total, outOf: s.score.outOf ? +s.score.outOf : null, round: s.score.round || '' } : null,
+      score: score,
+      card: card,
       notes: s.notes || '',
       created: s.created || new Date().toISOString(),
       updated: s.updated || new Date().toISOString()
@@ -193,6 +269,12 @@
       round: c.round || '',
       distance: c.distance ? +c.distance : null,
       notes: c.notes || '',
+      /* 'A' events get a taper before and a recovery week after; 'B' events are
+         shot through without reshaping the block around them. */
+      priority: c.priority === 'B' ? 'B' : 'A',
+      arrows: c.arrows ? +c.arrows : null,
+      url: c.url || '',
+      confirmed: c.confirmed !== false,
       result: c.result || null,      // {score, outOf, place, fieldSize}
       checklist: c.checklist || null,
       updated: new Date().toISOString()
@@ -303,6 +385,23 @@
     return Object.keys(byRound).map(function (k) { return { round: k, session: byRound[k] }; });
   }
 
+  function scorecards() {
+    return state.sessions.filter(function (s) { return !!s.card; });
+  }
+
+  function scoresCSV() {
+    var head = ['date', 'round', 'distance', 'end', 'arrows', 'end_total', 'end_xs', 'running_total', 'session_score', 'session_out_of'];
+    var rows = [];
+    scorecards().forEach(function (s) {
+      var t = cardTotals(s.card);
+      t.rows.forEach(function (r) {
+        rows.push([s.date, '"' + roundLabel(s.card).replace(/"/g, '""') + '"', s.card.distance || s.distance || '',
+          r.i + 1, '"' + r.a.join(' ') + '"', r.total, r.xs, r.run, t.score, t.outOf].join(','));
+      });
+    });
+    return [head.join(',')].concat(rows).join('\n');
+  }
+
   /* ---------- gear ---------- */
   function activeString() {
     var live = state.gear.strings.filter(function (s) { return !s.retired; });
@@ -392,11 +491,12 @@
       st: state.settings.practiceDays.join('') + '|' + state.settings.sessionMinutes + '|' + state.settings.baseArrows,
       s: state.sessions.map(function (x) {
         return [x.date, x.arrows, x.setSize || 0, x.minutes || 0, x.distance || 0, x.type || '', x.rpe || 0,
-        x.score ? x.score.total : 0, x.score && x.score.outOf ? x.score.outOf : 0, x.notes || ''];
+        x.score ? x.score.total : 0, x.score && x.score.outOf ? x.score.outOf : 0, x.notes || '', x.card || 0];
       }),
       c: state.competitions.map(function (x) {
         return [x.date, x.name, x.location || '', x.round || '', x.distance || 0,
-        x.result ? (x.result.score || 0) : 0, x.result ? (x.result.place || 0) : 0];
+        x.result ? (x.result.score || 0) : 0, x.result ? (x.result.place || 0) : 0,
+        x.priority || 'A', x.arrows || 0, x.confirmed === false ? 0 : 1];
       })
     };
   }
@@ -416,13 +516,15 @@
         date: a[0], arrows: a[1], setSize: a[2] || null, minutes: a[3] || null, distance: a[4] || null,
         type: a[5] || 'volume', rpe: a[6] || null,
         score: a[7] ? { total: a[7], outOf: a[8] || null, round: '' } : null,
-        notes: a[9] || ''
+        notes: a[9] || '',
+        card: a[10] || null
       });
     });
     out.competitions = (snap.c || []).map(function (a) {
       return {
         id: uid(), date: a[0], name: a[1], location: a[2], round: a[3], distance: a[4] || null,
-        notes: '', result: a[5] ? { score: a[5], place: a[6] || null } : null, checklist: null
+        notes: '', result: a[5] ? { score: a[5], place: a[6] || null } : null, checklist: null,
+        priority: a[7] || 'A', arrows: a[8] || null, confirmed: a[9] !== 0
       };
     });
     return out;
@@ -523,10 +625,10 @@
   }
 
   function toCSV() {
-    var head = ['date', 'arrows', 'set_size', 'minutes', 'distance', 'type', 'rpe', 'score', 'score_out_of', 'notes'];
+    var head = ['date', 'arrows', 'set_size', 'minutes', 'distance', 'type', 'rpe', 'score', 'score_out_of', 'xs', 'notes'];
     var rows = state.sessions.map(function (s) {
       return [s.date, s.arrows, s.setSize || '', s.minutes || '', s.distance || '', s.type, s.rpe || '',
-      s.score ? s.score.total : '', s.score && s.score.outOf ? s.score.outOf : '',
+      s.score ? s.score.total : '', s.score && s.score.outOf ? s.score.outOf : '', s.score && s.score.xs != null ? s.score.xs : '',
       '"' + String(s.notes || '').replace(/"/g, '""') + '"'].join(',');
     });
     return [head.join(',')].concat(rows).join('\n');
@@ -540,6 +642,8 @@
     removeCompetition: removeCompetition, nextCompetition: nextCompetition,
     lifetimeArrows: lifetimeArrows, arrowsBetween: arrowsBetween, dailySeries: dailySeries,
     weeklySeries: weeklySeries, loadRatio: loadRatio, streakWeeks: streakWeeks, personalBests: personalBests,
+    scorecards: scorecards, cardTotals: cardTotals, normaliseCard: normaliseCard, arrowValue: arrowValue,
+    roundLabel: roundLabel, ARROW_VALUES: ARROW_VALUES, scoresCSV: scoresCSV,
     activeString: activeString, stringArrows: stringArrows, addString: addString,
     setSightMark: setSightMark, removeSightMark: removeSightMark,
     setSettings: setSettings,

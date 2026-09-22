@@ -1,10 +1,10 @@
 /* sw.js — caches the app shell so it opens instantly and works with no signal
    (club fields have famously bad reception). Data never leaves localStorage. */
-var CACHE = 'archery-log-v3';
+var CACHE = 'archery-log-v5';
 var SHELL = [
   './', './index.html', './css/app.css',
-  './js/store.js', './js/sync.js', './js/parse.js', './js/plan.js', './js/charts.js',
-  './js/views.js', './js/views2.js', './js/app.js',
+  './js/store.js', './js/sync.js', './js/parse.js', './js/plan.js', './js/season.js', './js/charts.js',
+  './js/views.js', './js/views2.js', './js/scores.js', './js/app.js',
   './manifest.webmanifest', './icons/icon.svg'
 ];
 

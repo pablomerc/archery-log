@@ -320,6 +320,124 @@
     setTimeout(function () { if (!prefill) input.focus(); }, 60);
   };
 
+  /* ---------- season overview, drawn at the top of the Plan tab ---------- */
+  function renderSeason(root, ctx) {
+    var st = ctx.state;
+    var season = ctx.season;
+    if (!season) return;
+    var todayISO = D.iso(D.today());
+    var adh = Season.adherence(season, st.sessions);
+    var thisWeek = adh.filter(function (a) { return a.current; })[0];
+
+    var name = st.settings.seasonName || 'This season';
+    root.appendChild(card([
+      h('div', { class: 'label', text: 'SEASON PLAN' }),
+      h('h2', { text: name }),
+      h('div', { class: 'sub', text: D.fmtShort(season.from) + ' \u2192 ' + D.fmtShort(season.to) + ' \u00b7 ' + season.weeks.length + ' weeks' }),
+      h('div', { style: 'margin-top:10px' }, [
+        h('div', { class: 'kv' }, [h('span', { class: 'k', text: 'Competitions' }), h('span', { class: 'v', text: season.competitions.length })]),
+        h('div', { class: 'kv' }, [h('span', { class: 'k', text: 'Starting at' }), h('span', { class: 'v', text: season.startWeekly + ' arrows / week' })]),
+        h('div', { class: 'kv' }, [h('span', { class: 'k', text: 'Peak' }), h('span', { class: 'v', text: season.reaches + ' arrows / week' })]),
+        h('div', { class: 'kv' }, [h('span', { class: 'k', text: 'Season total' }), h('span', { class: 'v', text: season.totalArrows.toLocaleString() + ' arrows' })]),
+        thisWeek ? h('div', { class: 'kv' }, [
+          h('span', { class: 'k', text: 'This week' }),
+          h('span', { class: 'v', text: thisWeek.actual + ' of ' + thisWeek.target + (thisWeek.pct != null ? ' \u00b7 ' + thisWeek.pct + '%' : '') })
+        ]) : null
+      ])
+    ], 'countdown'));
+
+    if (thisWeek) {
+      var w = season.weeks.filter(function (x) { return x.start === thisWeek.start; })[0];
+      var pctv = Math.min(100, thisWeek.pct || 0);
+      root.appendChild(card([
+        h('div', { class: 'card-head' }, [
+          h('h3', { text: 'This week' }),
+          h('div', { class: 'spacer' }),
+          h('span', { class: 'tag ' + phaseTag(w.phase), text: w.phase })
+        ]),
+        h('div', { style: 'display:flex;align-items:baseline;gap:10px;flex-wrap:wrap' }, [
+          h('strong', { style: 'font-size:1.6rem;font-variant-numeric:tabular-nums', text: thisWeek.actual + ' / ' + thisWeek.target }),
+          h('span', { class: 'muted', text: w.split ? 'suggested ' + w.split.days + ' \u00d7 ' + w.split.perSession : 'competition schedule' })
+        ]),
+        h('div', { class: 'bar-mini' }, [h('i', { class: pctv >= 100 ? 'good' : '', style: 'width:' + pctv + '%' })]),
+        h('div', { class: 'hint', text: w.note })
+      ], 'tight'));
+    }
+
+    var seasonHost = h('div', { class: 'chart-wrap' });
+    root.appendChild(card([
+      cardHead('Weekly volume across the season', h('small', { class: 'faint', text: 'planned vs actual' })),
+      seasonHost,
+      h('div', { class: 'legend' }, [
+        h('span', {}, [h('i', { class: 'swatch', style: 'background:var(--accent)' }), 'shot']),
+        h('span', {}, [h('i', { class: 'swatch', style: 'background:var(--text-faint);opacity:.35' }), 'planned']),
+        h('span', {}, [h('i', { class: 'swatch', style: 'background:var(--gold)' }), 'competition'])
+      ])
+    ]));
+    var actualByWeek = {};
+    st.sessions.forEach(function (x) {
+      var k = D.iso(D.weekStart(D.parseISO(x.date)));
+      actualByWeek[k] = (actualByWeek[k] || 0) + x.arrows;
+    });
+    Charts.responsive(seasonHost, function () {
+      Charts.weekly(seasonHost, season.weeks.map(function (w) {
+        return {
+          key: w.start, start: w.start, label: D.fmtShort(w.start),
+          arrows: actualByWeek[w.start] || 0, planned: w.target,
+          phase: w.comps.length ? 'comp' : (w.phase === 'taper' || w.phase === 'recover' ? 'taper' : w.phase)
+        };
+      }), { height: 230 });
+    });
+
+    if (season.advice && season.advice.length) {
+      root.appendChild(h('div', { class: 'banner' }, [
+        h('strong', { text: 'How to read this' }),
+        h('div', { style: 'margin-top:5px' }, season.advice.map(function (a) {
+          return h('p', { style: 'margin:0 0 7px', text: a });
+        }))
+      ]));
+    }
+
+    /* week-by-week sheet */
+    root.appendChild(card([
+      cardHead('Week by week', h('button', {
+        class: 'btn ghost sm', onclick: function () { ctx.download('season-plan.csv', seasonCSV(season, actualByWeek), 'text/csv'); }
+      }, ['Export CSV'])),
+      h('div', { class: 'table-wrap' }, [h('table', { class: 'sheet' }, [
+        h('thead', {}, [h('tr', {}, ['Week', 'Target', 'Suggested', 'Phase', 'Actual', ''].map(function (x) { return h('th', { text: x }); }))]),
+        h('tbody', {}, season.weeks.map(function (w) {
+          var actual = actualByWeek[w.start] || 0;
+          var isNow = w.start <= todayISO && w.end >= todayISO;
+          var past = w.end < todayISO;
+          return h('tr', {
+            style: (isNow ? 'background:var(--accent-soft)' : past ? 'opacity:.6' : '') + ';cursor:default'
+          }, [
+            h('td', { html: '<b>' + esc(D.fmtShort(w.start)) + '</b>' }),
+            h('td', { class: 'num', html: '<b>' + w.target + '</b>' }),
+            h('td', { class: 'num', text: w.split ? w.split.days + '\u00d7' + w.split.perSession : '\u2014' }),
+            h('td', {}, [h('span', { class: 'tag ' + phaseTag(w.phase), text: w.phase })]),
+            h('td', { class: 'num', text: past || isNow ? actual : '' }),
+            h('td', { text: w.comps.map(function (c) { return c.name; }).join(', ') })
+          ]);
+        }))
+      ])])
+    ]));
+  }
+
+  function phaseTag(p) {
+    return p === 'comp' ? 'comp' : p === 'taper' || p === 'recover' ? 'taper'
+      : p === 'peak' ? 'scoring' : p === 'offseason' ? 'tune' : 'volume';
+  }
+
+  function seasonCSV(season, actualByWeek) {
+    var head = ['week_start', 'week_end', 'phase', 'target_arrows', 'suggested_days', 'suggested_per_session', 'actual_arrows', 'competitions'];
+    var rows = season.weeks.map(function (w) {
+      return [w.start, w.end, w.phase, w.target, w.split ? w.split.days : '', w.split ? w.split.perSession : '',
+        actualByWeek[w.start] || 0, '"' + w.comps.map(function (c) { return c.name; }).join('; ') + '"'].join(',');
+    });
+    return [head.join(',')].concat(rows).join('\n');
+  }
+
   /* =========================================================
      PLAN
      ========================================================= */
@@ -328,6 +446,8 @@
     var st = ctx.state, plan = ctx.plan;
     var todayISO = D.iso(D.today());
     var comp = Store.nextCompetition();
+
+    renderSeason(root, ctx);
 
     if (!comp) {
       root.appendChild(card([
@@ -446,10 +566,15 @@
         if (c.round) bits.push(c.round);
         if (c.distance) bits.push(c.distance + 'm');
         if (c.result && c.result.score) bits.push('scored ' + c.result.score + (c.result.place ? ' · ' + ordinal(c.result.place) : ''));
+        if (c.confirmed === false) bits.unshift('date not published — estimated');
         return h('li', {}, [
           h('div', { class: 'when', text: D.fmtShort(c.date) }),
           h('div', { class: 'main' }, [
-            h('div', { class: 'title', text: c.name }),
+            h('div', { class: 'title' }, [
+              h('span', { text: c.name + ' ' }),
+              c.priority === 'B' ? h('span', { class: 'tag', text: 'B' }) : null,
+              c.confirmed === false ? h('span', { class: 'tag scoring', text: 'est.' }) : null
+            ]),
             h('div', { class: 'meta', text: bits.join(' · ') || '—' })
           ]),
           h('div', { class: 'amt', style: 'font-size:.8rem;color:var(--text-faint)', text: days > 0 ? 'in ' + days + 'd' : days === 0 ? 'today' : Math.abs(days) + 'd ago' }),
